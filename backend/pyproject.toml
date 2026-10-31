@@ -1,0 +1,36 @@
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.mypy]
+plugins = ["pydantic.mypy"]
+python_version = "3.12"
+strict = true
+warn_unused_ignores = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path", "fastapi.Cookie"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+# statsmodels ships no py.typed marker and has no stub package, so mypy
+# cannot analyze it. Scoped to this one module rather than a global
+# ignore_missing_imports, so a genuinely missing import anywhere else
+# still gets caught.
+[[tool.mypy.overrides]]
+module = ["statsmodels.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["reportlab", "reportlab.*"]
+ignore_missing_imports = true
+
+[tool.ruff.lint.per-file-ignores]
+# Dense report-layout table code: the formatter cannot wrap long string literals.
+"app/services/report_pdf.py" = ["E501"]

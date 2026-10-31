@@ -1,0 +1,43 @@
+# Single public entrance. Caddy gets and renews the HTTPS certificate by itself.
+# SITE_ADDRESS is your domain (e.g. app.example.com). For a local trial use ":8080".
+{$SITE_ADDRESS:localhost} {
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+
+	# API calls go straight to the backend (they never pass through Next.js).
+	# Oversized uploads are refused here immediately, even when a client only
+	# *declares* a huge Content-Length and sends nothing. This is what closes
+	# the "early Content-Length" limitation that exists when Next.js proxies.
+	@api path /api/*
+	handle @api {
+		# 1) A request that DECLARES a body bigger than the limit is refused at once,
+		#    before any body is read (the declared size is checked, not the bytes sent).
+		@declared_too_big expression `{http.request.header.Content-Length}.size() > 0 && int({http.request.header.Content-Length}) > {$MAX_BODY_BYTES:28311552}`
+		handle @declared_too_big {
+			header Content-Type application/json
+			header Connection close
+			respond `{"error":{"code":"file_too_large","message":"This upload is larger than the maximum file size.","details":{}}}` 413
+		}
+		# 2) A body sent without a declared size (chunked) is cut off at the same limit.
+		request_body {
+			max_size {$MAX_BODY_BYTES:28311552}
+		}
+		reverse_proxy {$BACKEND_UPSTREAM:backend:8000} {
+			transport http {
+				read_timeout 120s
+			}
+		}
+	}
+
+	handle {
+		reverse_proxy {$FRONTEND_UPSTREAM:frontend:3000}
+	}
+}

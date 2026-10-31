@@ -1,0 +1,12 @@
+# Never commit real secrets or build output.
+.env
+.env.production
+.env.*.local
+node_modules/
+.next/
+__pycache__/
+*.pyc
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+backend/var/
